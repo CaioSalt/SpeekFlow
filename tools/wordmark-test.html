@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html style="background:#111; margin:0; padding:40px; display:flex; flex-direction:column; gap:40px; align-items:center;">
+<body style="margin:0; display:flex; flex-direction:column; gap:40px; align-items:center;">
+  <div id="orig" style="background:#111; padding:20px;"></div>
+  <div id="novo" style="background:#111; padding:20px;"></div>
+  <script>
+    fetch('original-wordmark.svg').then(r=>r.text()).then(t=>{
+      const d = document.createElement('div');
+      d.style.width = '500px';
+      d.innerHTML = t;
+      const svg = d.querySelector('svg');
+      svg.setAttribute('width','500');
+      svg.querySelectorAll('path').forEach(p => p.setAttribute('fill', '#ffffff'));
+      document.getElementById('orig').appendChild(svg);
+    });
+    fetch('SpeekFlow-wordmark.svg').then(r=>r.text()).then(t=>{
+      const d = document.createElement('div');
+      d.style.width = '500px';
+      d.innerHTML = t;
+      document.getElementById('novo').appendChild(d.querySelector('svg'));
+    });
+  </script>
+</body>
+</html>
