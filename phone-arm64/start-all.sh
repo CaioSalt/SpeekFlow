@@ -66,13 +66,23 @@ port_open 8080 || port_open 8443 || {
   sh /root/speekflow/rebrand-phone.sh /root/speekflow/web/dist_injected_ext
 }
 
-echo "[8/9] Caddy (porta 8080)..."
+echo "[8/9] Caddy (LAN :8080 + HTTPS :8443)..."
 port_open 8080 || (cd /root/speekflow/config && caddy start --config Caddyfile > $LOG/caddy.log 2>&1)
 
-echo "[9/9] Verificando servicos..."
+echo "[9/10] Cloudflare Tunnel (trycloudflare.com - gratuito, URL aleatoria)..."
+pgrep -x cloudflared > /dev/null || {
+  : > $LOG/cloudflared.log
+  nohup /root/speekflow/bin/cloudflared tunnel --url http://127.0.0.1:8080 > $LOG/cloudflared.log 2>&1 &
+  for i in $(seq 1 30); do grep -q 'Your quick Tunnel' $LOG/cloudflared.log && break; sleep 1; done
+  url=$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' $LOG/cloudflared.log | head -1)
+  if [ -n "$url" ]; then echo "  Tunnel URL publica: $url"; else echo "  Tunnel iniciado (pode levar alguns segundos para a URL aparecer)"; fi
+}
+
+echo "[10/10] Verificando servicos..."
 sleep 5
 bash /root/speekflow/status.sh
 echo ""
 echo "LAN (rede local): http://192.168.0.54:8080"
-echo "Ext (internet):   https://speekflow.duckdns.org (port forward 443->8443 no roteador)"
+echo "Internet (gratis): URL trycloudflare.com impressa acima (muda a cada reinicio)"
+echo "Ext (internet):    https://speekflow.duckdns.org (port forward 443->8443 no roteador)"
 echo "Desligar tudo: proot-distro login ubuntu -- /root/speekflow/stop-all.sh"
