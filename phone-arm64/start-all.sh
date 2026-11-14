@@ -20,6 +20,7 @@ fi
 echo "  string de conexao encontrada (Atlas)"
 
 echo "[2/9] Valkey (compativel Redis)..."
+service cron start 2>&1 || true
 port_open 6379 || valkey-server --daemonize yes --bind 127.0.0.1 --port 6379 --ignore-warnings ARM64-COW-BUG --logfile $LOG/valkey.log
 for i in $(seq 1 30); do port_open 6379 && break; sleep 1; done
 
