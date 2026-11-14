@@ -7,6 +7,12 @@
 phone-arm64/tars/
 phone-arm64/bin/
 
+# Builds locais do frontend (gerados pelo start-all.sh)
+phone-arm64/web/dist_lan/
+phone-arm64/web/dist_ext/
+phone-arm64/web/dist_injected_lan/
+phone-arm64/web/dist_injected_ext/
+
 .env
 .env.web
 Revolt.toml

@@ -1,5 +1,11 @@
-{$HOSTNAME} {
-	route /.well-known/stoat {
+# SpeekFlow - Caddy com sites LAN (HTTP) e EXT (HTTPS)
+{
+	auto_https disable_redirects
+}
+
+(app_routes) {
+	@stoat path /.well-known/stoat
+	handle @stoat {
 		uri strip_prefix /.well-known/stoat
 		header {
 			Access-Control-Allow-Origin *
@@ -9,54 +15,94 @@
 		}
 	}
 
-	route /api* {
+	@api path /api*
+	handle @api {
 		uri strip_prefix /api
 		reverse_proxy http://127.0.0.1:14702 {
 			header_down Location "^/" "/api/"
 		}
 	}
 
-	route /ws {
+	@ws path /ws
+	handle @ws {
 		uri strip_prefix /ws
 		reverse_proxy http://127.0.0.1:14703 {
 			header_down Location "^/" "/ws/"
 		}
 	}
 
-	route /autumn* {
+	@autumn path /autumn*
+	handle @autumn {
 		uri strip_prefix /autumn
 		reverse_proxy http://127.0.0.1:14704 {
 			header_down Location "^/" "/autumn/"
 		}
 	}
 
-	route /january* {
+	@january path /january*
+	handle @january {
 		uri strip_prefix /january
 		reverse_proxy http://127.0.0.1:14705 {
 			header_down Location "^/" "/january/"
 		}
 	}
 
-	route /gifbox* {
+	@gifbox path /gifbox*
+	handle @gifbox {
 		uri strip_prefix /gifbox
 		reverse_proxy http://127.0.0.1:14706 {
 			header_down Location "^/" "/gifbox/"
 		}
 	}
 
-	route /livekit* {
+	@livekit path /livekit*
+	handle @livekit {
 		uri strip_prefix /livekit
 		reverse_proxy http://127.0.0.1:7880 {
 			header_down Location "^/" "/livekit/"
 		}
 	}
 
-	route /ingress* {
+	@ingress path /ingress*
+	handle @ingress {
 		uri strip_prefix /ingress
 		reverse_proxy http://127.0.0.1:8500 {
 			header_down Location "^/" "/ingress/"
 		}
 	}
+}
 
-	reverse_proxy http://127.0.0.1:5000
+(lan_site) {
+	import app_routes
+	handle {
+		root * /root/speekflow/web/dist_injected_lan
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+(ext_site) {
+	import app_routes
+	handle {
+		root * /root/speekflow/web/dist_injected_ext
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+# HTTP LAN
+:8080 {
+	# ACME challenge para renovacao de certificado (externo chega aqui via 80->8080)
+	@acme path /.well-known/acme-challenge/*
+	handle @acme {
+		root * /var/www/certbot
+		file_server
+	}
+	import lan_site
+}
+
+# HTTPS EXTERNO (roteador: 443 -> 8443)
+:8443 {
+	tls /etc/letsencrypt/live/speekflow.duckdns.org/fullchain.pem /etc/letsencrypt/live/speekflow.duckdns.org/privkey.pem
+	import ext_site
 }

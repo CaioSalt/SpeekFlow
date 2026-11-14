@@ -6,6 +6,26 @@
   <link rel="preload" as="font" type="font/woff2" href="/assets/material-symbols-rounded-bQMFBCu4.woff2" crossorigin>
   <link rel="preload" as="font" type="font/woff2" href="/assets/material-symbols-sharp-D043Ktqt.woff2" crossorigin>
 
+  <script>/* SpeekFlow: stub de mediaDevices para origem nao-segura (http://) — o Chrome so
+     expõe navigator.mediaDevices em HTTPS/localhost; sem isto o bundle quebra na carga. */
+    try {
+      if (!window.navigator.mediaDevices) {
+        window.navigator.mediaDevices = {
+          addEventListener: function () {},
+          removeEventListener: function () {},
+          dispatchEvent: function () { return false; },
+          enumerateDevices: function () { return Promise.resolve([]); },
+          getDisplayMedia: function () {
+            return Promise.reject(new DOMException('Screen share requires a secure context (HTTPS or localhost)', 'NotSupportedError'));
+          },
+          getUserMedia: function () {
+            return Promise.reject(new DOMException('Voice/video requires a secure context (HTTPS or localhost)', 'NotSupportedError'));
+          }
+        };
+      }
+    } catch (e) {}
+  </script>
+
   <script type="module" crossorigin src="/assets/polyfills-DUc9ZrN4.js"></script>
 
   <meta charset="utf-8">

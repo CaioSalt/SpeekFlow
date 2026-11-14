@@ -9,6 +9,25 @@
   <meta name="theme-color" content="#000">
   <meta name="theme-color" content="#000" media="(prefers-color-scheme: dark)">
   <meta http-equiv="cache-control" content="no-cache">
+  <script>/* SpeekFlow: stub de mediaDevices para origem nao-segura (http://) — o Chrome so
+     expõe navigator.mediaDevices em HTTPS/localhost; sem isto o bundle quebra na carga. */
+    try {
+      if (!window.navigator.mediaDevices) {
+        window.navigator.mediaDevices = {
+          addEventListener: function () {},
+          removeEventListener: function () {},
+          dispatchEvent: function () { return false; },
+          enumerateDevices: function () { return Promise.resolve([]); },
+          getDisplayMedia: function () {
+            return Promise.reject(new DOMException('Screen share requires a secure context (HTTPS or localhost)', 'NotSupportedError'));
+          },
+          getUserMedia: function () {
+            return Promise.reject(new DOMException('Voice/video requires a secure context (HTTPS or localhost)', 'NotSupportedError'));
+          }
+        };
+      }
+    } catch (e) {}
+  </script>
   <link rel="shortcut icon" type="image/png" href="./public/assets/web/icon.ico">
   <title>Stoat</title>
 </head>

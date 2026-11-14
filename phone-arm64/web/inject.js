@@ -7,8 +7,9 @@ const {
 } = require("node:fs");
 const { join } = require("node:path");
 
-const BUILD_DIR = "dist";
-const OUT_DIR = "dist_injected";
+// arg1 = source dir (default "dist"), arg2 = output dir (default "dist_injected")
+const BUILD_DIR = process.argv[2] || "dist";
+const OUT_DIR = process.argv[3] || "dist_injected";
 
 // Map of placeholder to env var name
 // At build time, Vite replaces import.meta.env.VITE_X with the literal string value.
@@ -23,7 +24,7 @@ const REPLACEMENTS = {
   __VITE_RNNOISE_WORKLET_CDN_URL__: process.env.VITE_RNNOISE_WORKLET_CDN_URL,
 };
 
-console.log("Preparing injected build...");
+console.log(`Preparing injected build (${BUILD_DIR} -> ${OUT_DIR})...`);
 
 rmSync(OUT_DIR, { recursive: true, force: true });
 cpSync(BUILD_DIR, OUT_DIR, { recursive: true });

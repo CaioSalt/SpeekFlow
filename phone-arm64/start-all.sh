@@ -7,7 +7,7 @@ cd /root/speekflow
 mkdir -p /root/logs
 export PATH=/root/speekflow/bin/usr-local-bin:$PATH
 export LD_LIBRARY_PATH=/root/speekflow/bin/lib:$LD_LIBRARY_PATH
-set -a; . config/secrets.env; . config/.env.web; set +a
+set -a; . config/secrets.env; set +a
 LOG=/root/logs
 port_open() { (echo >/dev/tcp/127.0.0.1/$1) 2>/dev/null; }
 
@@ -50,12 +50,20 @@ pkill -x crond 2>/dev/null; pkill -x pushd 2>/dev/null
 nohup ./bin/crond > $LOG/crond.log 2>&1 &
 nohup ./bin/pushd > $LOG/pushd.log 2>&1 &
 
-echo "[7/9] Frontend web..."
+echo "[7/9] Frontend web (dois builds: LAN e publico)..."
 cd /root/speekflow/web
-port_open 5000 || {
-  node inject.js > $LOG/web.log 2>&1
-  sh /root/speekflow/rebrand-phone.sh >> $LOG/web.log 2>&1
-  nohup node node_modules/sirv-cli/bin.js dist_injected --port 5000 --cors --single --host >> $LOG/web.log 2>&1 &
+port_open 8080 || port_open 8443 || {
+  rm -rf dist_lan dist_ext dist_injected_lan dist_injected_ext
+  # LAN (http://192.168.0.54:8080)
+  cp -a dist dist_lan
+  set -a; . /root/speekflow/config/.env.lan; set +a
+  node inject.js dist_lan dist_injected_lan
+  sh /root/speekflow/rebrand-phone.sh /root/speekflow/web/dist_injected_lan
+  # EXTERNO (https://speekflow.duckdns.org)
+  cp -a dist dist_ext
+  set -a; . /root/speekflow/config/.env.ext; set +a
+  node inject.js dist_ext dist_injected_ext
+  sh /root/speekflow/rebrand-phone.sh /root/speekflow/web/dist_injected_ext
 }
 
 echo "[8/9] Caddy (porta 8080)..."
@@ -65,6 +73,6 @@ echo "[9/9] Verificando servicos..."
 sleep 5
 bash /root/speekflow/status.sh
 echo ""
-echo "Se tudo estiver OK, abra no navegador: http://localhost:8080 (no celular)"
-echo "Ou, na rede local, de qualquer dispositivo: http://192.168.0.54:8080"
+echo "LAN (rede local): http://192.168.0.54:8080"
+echo "Ext (internet):   https://speekflow.duckdns.org (port forward 443->8443 no roteador)"
 echo "Desligar tudo: proot-distro login ubuntu -- /root/speekflow/stop-all.sh"
