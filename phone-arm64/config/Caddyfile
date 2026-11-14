@@ -101,8 +101,7 @@
 	import lan_site
 }
 
-# HTTPS EXTERNO (roteador: 443 -> 8443)
+# HTTP - EXT (cloudflared tunnel -> 127.0.0.1:8443 : frontend EXT já aponta para o tunnel)
 :8443 {
-	tls /etc/letsencrypt/live/speekflow.duckdns.org/fullchain.pem /etc/letsencrypt/live/speekflow.duckdns.org/privkey.pem
 	import ext_site
 }
