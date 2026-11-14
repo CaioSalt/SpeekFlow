@@ -1,5 +1,8 @@
 #!/bin/bash
 # SpeekFlow - etapa 2 (dentro do Ubuntu proot): instalar servicos
+# IMPORTANTE: o mongod oficial NAO sobe no kernel do Android/proot,
+# entao o banco fica no MongoDB Atlas (gratis). Configure a string em
+# /root/speekflow/config/Revolt.toml ANTES de ligar (veja Passo 1/9 do start-all.sh).
 set -e
 export DEBIAN_FRONTEND=noninteractive
 
@@ -9,21 +12,19 @@ printf '#!/bin/sh\nexit 101\n' > /usr/sbin/policy-rc.d && chmod +x /usr/sbin/pol
 echo "[1/5] APT update..."
 apt-get update -y
 
-echo "[2/5] Instalando node, redis, rabbitmq, ffmpeg (demora varios minutos)..."
-apt-get install -y procps redis-server rabbitmq-server nodejs npm ffmpeg curl gpg
+echo "[2/5] Instalando valkey, rabbitmq, nodejs, caddy (demora varios minutos)..."
+apt-get install -y --no-install-recommends valkey rabbitmq-server nodejs caddy procps curl gnupg ca-certificates
 
-echo "[3/5] Instalando Caddy (binario oficial arm64)..."
-dpkg -i /root/payload/caddy_arm64.deb || apt-get -f install -y
+echo "[3/5] Verificando caddy..."
+caddy version
 
-echo "[4/5] Instalando MongoDB 8 (repo oficial arm64)..."
-curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc -o /tmp/mongo.asc
-gpg -o /usr/share/keyrings/mongodb-server-8.0.gpg --dearmor /tmp/mongo.asc
-echo "deb [ arch=arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu noble/mongodb-org/8.0 multiverse" > /etc/apt/sources.list.d/mongodb-org-8.0.list
-apt-get update -y
-apt-get install -y mongodb-org
+echo "[4/5] MongoDB fica EXTERNO (Atlas) - nada a instalar."
+echo "      Configure a string de conexao em /root/speekflow/config/Revolt.toml:"
+echo "      [database]"
+echo "      mongodb = \"mongodb+srv://<usuario>:<senha>@<cluster>.mongodb.net/?retryWrites=true&w=majority\""
 
 echo "[5/5] Montando estrutura /root/speekflow..."
-mkdir -p /root/speekflow /root/data/db /root/data/minio /root/logs
+mkdir -p /root/speekflow /root/data/minio /root/logs
 cp -r /root/payload/bin /root/payload/web /root/payload/config /root/speekflow/
 cp /root/payload/rebrand-phone.sh /root/payload/start-all.sh /root/payload/stop-all.sh /root/payload/status.sh /root/speekflow/
 chmod +x /root/speekflow/bin/* /root/speekflow/bin/usr-local-bin/* /root/speekflow/*.sh
@@ -37,5 +38,6 @@ grep -q "$(hostname)" /etc/hosts || echo "127.0.0.1 $(hostname)" >> /etc/hosts
 
 echo ""
 echo "=== INSTALACAO CONCLUIDA ==="
-echo "Para ligar o servidor:"
+echo "PASSO FINAL: edite /root/speekflow/config/Revolt.toml com a string do MongoDB Atlas."
+echo "Depois ligue o servidor:"
 echo "  proot-distro login ubuntu -- /root/speekflow/start-all.sh"

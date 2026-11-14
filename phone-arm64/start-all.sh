@@ -1,5 +1,8 @@
 #!/bin/bash
 # SpeekFlow - ligar todos os servicos (dentro do Ubuntu proot)
+# MongoDB: NAO roda local (o mongod oficial nao sobe no proot/kernel do Android).
+# O banco de dados fica no MongoDB Atlas (preencha a string de conexao no config/Revolt.toml
+# antes de ligar - veja Revolt.toml/hosts.database e o guia no README).
 cd /root/speekflow
 mkdir -p /root/logs
 export PATH=/root/speekflow/bin/usr-local-bin:$PATH
@@ -8,12 +11,16 @@ set -a; . config/secrets.env; . config/.env.web; set +a
 LOG=/root/logs
 port_open() { (echo >/dev/tcp/127.0.0.1/$1) 2>/dev/null; }
 
-echo "[1/9] MongoDB..."
-port_open 27017 || mongod --dbpath /root/data/db --bind_ip 127.0.0.1 --wiredTigerCacheSizeGB 0.5 --fork --logpath $LOG/mongod.log || { echo "  FALHA - veja $LOG/mongod.log"; }
-for i in $(seq 1 30); do port_open 27017 && break; sleep 1; done
+echo "[1/9] MongoDB (Atlas, via config/Revolt.toml)..."
+if grep -qE 'mongodb(\+srv)?://(127\.0\.0\.1|localhost)' config/Revolt.toml; then
+  echo "  ATENCAO: a string mongodb em config/Revolt.toml aponta para 127.0.0.1/localhost."
+  echo "  O mongod NAO roda neste celular. Aponte para o MongoDB Atlas e rode este script de novo."
+  exit 1
+fi
+echo "  string de conexao encontrada (Atlas)"
 
-echo "[2/9] Redis..."
-port_open 6379 || redis-server --daemonize yes --bind 127.0.0.1 --port 6379 --ignore-warnings ARM64-COW-BUG --logfile $LOG/redis.log
+echo "[2/9] Valkey (compativel Redis)..."
+port_open 6379 || valkey-server --daemonize yes --bind 127.0.0.1 --port 6379 --ignore-warnings ARM64-COW-BUG --logfile $LOG/valkey.log
 for i in $(seq 1 30); do port_open 6379 && break; sleep 1; done
 
 echo "[3/9] RabbitMQ (pode levar 30s)..."
@@ -58,5 +65,6 @@ echo "[9/9] Verificando servicos..."
 sleep 5
 bash /root/speekflow/status.sh
 echo ""
-echo "Se tudo estiver OK, abra no navegador do celular: http://localhost:8080"
+echo "Se tudo estiver OK, abra no navegador: http://localhost:8080 (no celular)"
+echo "Ou, na rede local, de qualquer dispositivo: http://192.168.0.54:8080"
 echo "Desligar tudo: proot-distro login ubuntu -- /root/speekflow/stop-all.sh"
