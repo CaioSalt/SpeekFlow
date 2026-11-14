@@ -1,9 +1,12 @@
 rtc:
-  # use_external_ip=true: descobre o IP publico via STUN a cada start.
-  # NAO usar node_ip explicito: no Android/proot o livekit morre com
-  # "route ip+net: netlinkrib: invalid argument" antes de subir (visto apos
-  # reboot em nov/2026, aplica-se a 1.13.4).
-  use_external_ip: true
+  # Banco de candidatos ICE anunciados ao LiveKit.
+  # use_external_ip=true: STUN falha 100% da vez neste provedor ("context canceled")
+  # e o IPv4 publico NUNCA entra na lista de candidatos - a chamada fica muda.
+  # node_ip estatico: candidato IPv4 valido, funciona via forward no roteador
+  # (UDP 50000-50100 + TCP 7881 -> celular). A supervisao do start-all.sh
+  # reinicia o LiveKit se ele morrer no boot (netlink EINVAL, flaky).
+  use_external_ip: false
+  node_ip: <public-ipv4>
   port_range_start: 50000
   port_range_end: 50100
   tcp_port: 7881

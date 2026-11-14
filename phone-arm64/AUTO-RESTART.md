@@ -24,8 +24,8 @@ A Claro **bloqueia todo TCP de entrada** (80, 443, 8443, 18443, …) e o tráfeg
 - Chamadas de voz/vídeo caem no meio, mas o app volta a funcionar quando a rede volta.
 - Se o **IP público mudar** enquanto a internet ficou fora:
   - o cron (`*/5 * * * * /root/speekflow/duckdns-update.sh`) detecta e atualiza o DuckDNS (A e AAAA);
-  - o LiveKit **não precisa de sincronização manual**: usa `use_external_ip: true` (STUN) e descobre o IP público sozinho a cada start.
-  - ~~node_ip fixo no `livekit.yml`~~ **não use**: no Android/proot, o LiveKit 1.13.4 morre com `route ip+net: netlinkrib: invalid argument` antes de subir (confirmado após reboot em nov/2026).
+  - o LiveKit usa **`node_ip` estático** (`livekit.yml`) com o IPv4 público — STUN foi descartado em nov/2026: a validação de IP falha 100% ("context canceled") e o candidato IPv4 nunca entrava na lista ICE, deixando as chamadas mudas.
+  - Se o IP público mudar de novo, o `node_ip` precisa ser atualizado no `livekit.yml` (registrar um domínio + DDNS 🡢 o pedaço mais velho do mundo: `sed -i "s/node_ip: .*/node_ip: $NOVO_IP/"` + reinício do LiveKit).
 
 ## 2) O S21 FE desligou/reiniciou
 
