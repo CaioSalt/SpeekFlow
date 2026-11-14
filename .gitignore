@@ -13,6 +13,9 @@ phone-arm64/web/dist_ext/
 phone-arm64/web/dist_injected_lan/
 phone-arm64/web/dist_injected_ext/
 
+# Credenciais DuckDNS (celular)
+phone-arm64/config/duckdns.env
+
 .env
 .env.web
 Revolt.toml
