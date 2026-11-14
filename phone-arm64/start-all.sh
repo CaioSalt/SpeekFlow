@@ -89,6 +89,9 @@ port_open 8500 || nohup ./bin/voice-ingress > $LOG/voice-ingress.log 2>&1 &
 pkill -x crond 2>/dev/null; pkill -x pushd 2>/dev/null
 nohup ./bin/crond > $LOG/crond.log 2>&1 &
 nohup ./bin/pushd > $LOG/pushd.log 2>&1 &
+# cron do sistema (necessario para: DuckDNS a cada 5 min, certbot-renew, etc.)
+# Sem isto, nada atualiza o DuckDNS - o arquivo /etc/cron.d/duckdns fica orfao (sem ninguem executando).
+pgrep -x cron >/dev/null || nohup /usr/sbin/cron > $LOG/cron.log 2>&1 &
 
 echo "[9/10] Caddy (LAN :8080 + HTTPS :8443)..."
 port_open 8080 || (cd /root/speekflow/config && caddy start --config Caddyfile > $LOG/caddy.log 2>&1)

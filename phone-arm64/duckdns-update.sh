@@ -39,9 +39,27 @@ NEW="$NEW4"
 if [ -z "$NEW" ]; then NEW="$NEW6"; fi
 log "ipv4=$NEW4 ipv6=$NEW6 escolha=$NEW"
 
+# --- sincronizar node_ip do LiveKit com o IP publico atual (IPv4) ---
+# O port forward do roteador manda UDP 50000-50100 e TCP 7881 para o celular;
+# o LiveKit anuncia node_ip para os clientes. Se o IP mudar, voz/video quebram.
+sync_livekit_node_ip() {
+  LIVEKIT_YML=/root/speekflow/config/livekit.yml
+  if [[ "$NEW" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] && [ -f "$LIVEKIT_YML" ]; then
+    CUR_NODE_IP=$(grep -aoE 'node_ip:[[:space:]]*[0-9.]+' "$LIVEKIT_YML" | grep -aoE '[0-9.]+' | tail -1 || true)
+    if [ "$CUR_NODE_IP" != "$NEW" ]; then
+      sed -i -E "s/(node_ip:[[:space:]]*)[0-9.]+/\1$NEW/" "$LIVEKIT_YML"
+      log "livekit.yml: node_ip ${CUR_NODE_IP} -> $NEW"
+      if pkill -x livekit; then sleep 1; fi
+      nohup /root/speekflow/bin/livekit --config "$LIVEKIT_YML" > /root/logs/livekit.log 2>&1 &
+      log "livekit reiniciado com o novo IP"
+    fi
+  fi
+}
+
 OLD_CACHE=$(cat "$CACHE_FILE" 2>/dev/null || true)
 if [ "$FORCE" = 0 ] && [ "$NEW" = "$OLD_CACHE" ] && [ -n "$NEW" ]; then
   log "IP sem mudanca ($NEW) - nada a fazer."
+  sync_livekit_node_ip
   exit 0
 fi
 
@@ -52,6 +70,7 @@ log "resposta: $RESP"
 if [[ "$RESP" == OK* ]]; then
   echo "$NEW" > "$CACHE_FILE"
   log "cache atualizado para $NEW"
+  sync_livekit_node_ip
 else
   log "ERRO na atualizacao do DuckDNS"
   exit 1
