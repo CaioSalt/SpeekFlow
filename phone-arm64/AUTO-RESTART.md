@@ -4,21 +4,26 @@
 > 1. **Internet caiu** e voltou (celular ligado o tempo todo)
 > 2. **O S21 FE desligou/reiniciou**
 
-> URL pública FIXA desde nov/2026: **https://speekflow.duckdns.org:8443**
-> (TLS com Let's Encrypt, servido pelo Caddy direto no celular;
-> roteador precisa de port forward TCP 8443 → 192.168.0.54:8443)
+> URL pública via **Cloudflare Tunnel** (trycloudflare) — muda a cada boot do celular;
+> o `status-speekflow` e a tela do `start-speekflow` mostram a URL atual.
 > LAN: **http://192.168.0.54:8080**
+
+## Por que não tem URL fixa (nov/2026 — testado na prática)
+
+A Claro **bloqueia todo TCP de entrada** (80, 443, 8443, 18443, …) e o tráfego IPv6 também não passa no caminho usado pelo Claro BR. O único caminho externo confiável é a **saída HTTPS** para os servidores Cloudflare (o túnel trycloudflare, porta 443 de saída). O UDP 50000–50100 de entrada funciona (voz/vídeo); TCP 7881 também é usado para mídia.
+
+**Para ter URL fixa de verdade:** comprar um domínio (~R$ 20–40/ano), adicionar no Cloudflare (zona) e criar um *named tunnel* com hostname fixo. Aí `speekflow.seudominio.com` funciona sempre.
 
 ## 1) Internet caiu e voltou
 
 **Não precisa fazer nada.** Tudo se recupera sozinho:
 
 - O proot e os serviços (API, LiveKit, Caddy…) continuam rodando durante a queda.
-- O acesso externo (speekflow.duckdns.org:8443) volta assim que o IP público responde; não depende de túnel para existir.
+- O `cloudflared` reconecta automaticamente e mantém a mesma URL do túnel (a URL só muda quando a sessão do túnel termina — ex.: reboot).
 - O driver do MongoDB Atlas reconecta sozinho.
 - Chamadas de voz/vídeo caem no meio, mas o app volta a funcionar quando a rede volta.
 - Se o **IP público mudar** enquanto a internet ficou fora:
-  - o cron (`*/5 * * * * /root/speekflow/duckdns-update.sh`) detecta e atualiza o DuckDNS;
+  - o cron (`*/5 * * * * /root/speekflow/duckdns-update.sh`) detecta e atualiza o DuckDNS (A e AAAA);
   - o LiveKit **não precisa de sincronização manual**: usa `use_external_ip: true` (STUN) e descobre o IP público sozinho a cada start.
   - ~~node_ip fixo no `livekit.yml`~~ **não use**: no Android/proot, o LiveKit 1.13.4 morre com `route ip+net: netlinkrib: invalid argument` antes de subir (confirmado após reboot em nov/2026).
 
@@ -38,28 +43,16 @@
 
 1. Android termina o boot → Termux:Boot dispara `00-speekflow`.
 2. O script espera a rede (Wi-Fi/dados) responder `ping 1.1.1.1`.
-3. Chama `start-speekflow.sh` → proot persistente sobe tudo: Valkey, RabbitMQ, Silo, LiveKit, API e os demais serviços.
+3. Chama `start-speekflow.sh` → proot persistente sobe tudo: Valkey, RabbitMQ, Silo, LiveKit, túnel trycloudflare (apontando para :8443) e o rebuild do bundle EXT com a **nova URL do túnel** (passos `[6/10]` e `[7/10]`).
 4. `cron` sobe e agenda DuckDNS/certbot (a renovação do Let's Encrypt tem deploy-hook que reinicia o Caddy).
-5. EXT fica sempre em **https://speekflow.duckdns.org:8443** — não muda a cada boot.
+5. URL pública nova — consulte com `status-speekflow`.
 
 ### Se por algum motivo NÃO subir sozinho:
 
 ```bash
 # no Termux do celular:
 start-speekflow        # sobe tudo
-status-speekflow       # verifica portas
-```
-
-### Reverter para o túnel trycloudflare (emergência)
-
-O fluxo de túnel foi removido do `start-all.sh` na migração para DuckDNS (nov/2026). Se a Claro bloquear a porta 8443 no futuro:
-
-```bash
-# no Termux do celular:
-nohup /root/speekflow/bin/cloudflared tunnel --url http://127.0.0.1:8080 > /root/logs/cloudflared.log 2>&1 &
-# e reescreva /root/speekflow/config/Revolt.toml, /Revolt.toml, /stoat.json e /root/speekflow/config/stoat.json + .env.ext
-# apontando app/api/ws/autumn/january/gifbox/livekit para a URL do tunnel (veja no log),
-# depois rebuild o EXT: cp -a web/dist/. web/dist_ext/ && node web/inject.js ... (ou rode o commit anterior de start-all.sh)
+status-speekflow       # verifica portas + mostra a URL do túnel
 ```
 
 ### Para deixar ainda mais à prova de falhas (opcional):
@@ -67,3 +60,9 @@ nohup /root/speekflow/bin/cloudflared tunnel --url http://127.0.0.1:8080 > /root
 - **Configurações → Bateria → Limites de uso em segundo plano → Apps que não suspendem** → adicione `Termux` e `Termux:Boot`.
 - Mantenha o celular **na tomada** (o app `Stay awake` via developer options já está ativo).
 - Reserve o IP da LAN no roteador (ou deixe-o fixo) — a URL `http://192.168.0.54:8080` está "chumbada" na configuração.
+
+## Notas e decisões
+
+- O túnel apenas **transporta TCP (HTTPS/WSS)** — voz/vídeo ao vivo vão por **UDP 50000–50100 + TCP 7881** direto no IP público (UDP funciona nesse provedor; por isso a chamada funciona mesmo com todas as portas TCP de entrada bloqueadas).
+- O registro **AAAA** do `speekflow.duckdns.org` aponta para o IPv6 do celular (melhor esforço; atualizado a cada 5 min pelo cron) — mantido para o dia em que o filtro de IPv6 da Claro permitir.
+- O certificado Let's Encrypt de `speekflow.duckdns.org` existe em `/etc/letsencrypt` e seria usado num cenário direto (sem provedor bloqueando); hoje o acesso externo é sempre pelo túnel (cert do próprio Cloudflare, válido).

@@ -43,13 +43,63 @@ for i in $(seq 1 30); do port_open 9000 && break; sleep 1; done
 ./bin/mc mb --ignore-existing minio/revolt-uploads >/dev/null 2>&1 || true
 
 echo "[5/10] LiveKit (voz e video)..."
-port_open 7880 || nohup ./bin/livekit --config config/livekit.yml > $LOG/livekit.log 2>&1 &
+if ! port_open 7880; then
+  # Em alguns boots o LiveKit morre/trava na criacao do transport (netlink
+  # EINVAL no proot/Android, ligado ao estado da rota IPv6 do wlan0).
+  # Supervisiona: reinicia se morrer; mata e refaz se ficar travado.
+  rm -f $LOG/livekit.log
+  nohup ./bin/livekit --config config/livekit.yml > $LOG/livekit.log 2>&1 &
+  LK_OK=0
+  for i in $(seq 1 40); do
+    sleep 2
+    if port_open 7880; then LK_OK=1; break; fi
+    if ! pgrep -x livekit > /dev/null; then
+      echo "  LiveKit morreu (tentativa $((i/5+1))) - reiniciando..."
+      rm -f $LOG/livekit.log
+      nohup ./bin/livekit --config config/livekit.yml > $LOG/livekit.log 2>&1 &
+    elif [ $i -ge 12 ]; then
+      echo "  LiveKit travado (i=$i) - matando e tentando de novo..."
+      pkill -9 -x livekit; sleep 1
+      rm -f $LOG/livekit.log
+      nohup ./bin/livekit --config config/livekit.yml > $LOG/livekit.log 2>&1 &
+    fi
+  done
+  [ "$LK_OK" = 1 ] || echo "  ATENCAO: LiveKit nao subiu - ver $LOG/livekit.log"
+fi
 
-echo "[6/10] Tunnel trycloudflare: DESATIVADO."
-echo "  EXT usa a URL fixa https://speekflow.duckdns.org:8443 (TLS Let's Encrypt no Caddy)."
-echo "  Para reverter ao tunnel: iniciar cloudflared manualmente e reescrever os hosts."
+echo "[6/10] Cloudflare Tunnel (trycloudflare - Claro bloqueia entrada TCP, tunnel e a saida via HTTPS de saida)..."
+pgrep -x cloudflared > /dev/null || {
+  : > $LOG/cloudflared.log
+  nohup /root/speekflow/bin/cloudflared tunnel --url http://127.0.0.1:8443 > $LOG/cloudflared.log 2>&1 &
+  for i in $(seq 1 60); do grep -q 'Your quick Tunnel' $LOG/cloudflared.log && break; sleep 1; done
+  echo "  Tunnel iniciado"
+}
 
-echo "[7/10] Hosts EXT fixos em speekflow.duckdns.org:8443 (nada a redescobrir)."
+echo "[7/10] Redescobrindo URL do tunnel e rebuildando EXT..."
+NEW_URL=""
+for i in $(seq 1 30); do
+  NEW_URL=$(grep -aoE 'https://[a-z0-9-]+\.trycloudflare\.com' $LOG/cloudflared.log | tail -1)
+  [ -n "$NEW_URL" ] && break
+  sleep 1
+done
+if [ -z "$NEW_URL" ]; then
+  echo "  AVISO: URL do tunnel nao foi descoberta ainda - usando o bundle EXT antigo."
+else
+  echo "  Tunnel URL: $NEW_URL"
+  HOST=${NEW_URL#https://}
+  # reescrever config para a nova URL
+  sed -i "s|[a-z0-9-]*\.trycloudflare\.com|${HOST}|g" /root/speekflow/config/Revolt.toml /root/speekflow/config/stoat.json /root/speekflow/config/.env.ext /Revolt.toml /stoat.json
+  sed -i "s|https://speekflow\.duckdns\.org:8443|${NEW_URL}|g" /root/speekflow/config/Revolt.toml /root/speekflow/config/stoat.json /root/speekflow/config/.env.ext /Revolt.toml /stoat.json
+  sed -i "s|wss://speekflow\.duckdns\.org:8443|wss://${HOST}|g" /root/speekflow/config/Revolt.toml /root/speekflow/config/.env.ext /Revolt.toml
+  # rebuild do bundle EXT com a nova URL
+  rm -rf /root/speekflow/web/dist_ext /root/speekflow/web/dist_injected_ext
+  mkdir -p /root/speekflow/web/dist_ext
+  cp -a /root/speekflow/web/dist/. /root/speekflow/web/dist_ext/
+  set -a; . /root/speekflow/config/.env.ext; set +a
+  cd /root/speekflow/web && node inject.js dist_ext dist_injected_ext
+  cd ../.. && sh /root/speekflow/rebrand-phone.sh /root/speekflow/web/dist_injected_ext >/dev/null
+  echo "  EXT bundle atualizado para a URL do tunnel."
+fi
 cd /root/speekflow
 
 echo "[8/10] Servicos do SpeekFlow (api, eventos, arquivos)..."
@@ -66,13 +116,14 @@ nohup ./bin/pushd > $LOG/pushd.log 2>&1 &
 # Sem isto, nada atualiza o DuckDNS - o arquivo /etc/cron.d/duckdns fica orfao (sem ninguem executando).
 pgrep -x cron >/dev/null || nohup /usr/sbin/cron > $LOG/cron.log 2>&1 &
 
-echo "[9/10] Caddy (LAN :8080 + HTTPS EXT :8443 com Let's Encrypt)..."
+echo "[9/10] Caddy (LAN :8080 + EXT :8443 HTTP)..."
 port_open 8080 || (cd /root/speekflow/config && caddy start --config Caddyfile > $LOG/caddy.log 2>&1)
 
 echo "[10/10] Verificando servicos..."
 sleep 5
 bash /root/speekflow/status.sh
 echo ""
-echo "EXT (HTTPS fixo, Let's Encrypt): https://speekflow.duckdns.org:8443"
+EXT_URL=$(grep -aoE 'https://[a-z0-9-]+\.trycloudflare\.com' $LOG/cloudflared.log | tail -1)
+echo "EXT via tunnel (URL muda a cada restart): ${EXT_URL:-<aguardando>}"
 echo "LAN (rede local): http://192.168.0.54:8080"
 echo "Desligar tudo: proot-distro login ubuntu -- /root/speekflow/stop-all.sh"

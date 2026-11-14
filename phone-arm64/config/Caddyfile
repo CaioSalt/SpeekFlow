@@ -101,9 +101,7 @@
 	import lan_site
 }
 
-# HTTPS EXT - certificado Let's Encrypt do DuckDNS (speekflow.duckdns.org:8443)
-# (producao: direcao publica fixa; router deve ter port forward TCP 8443 -> celular)
-speekflow.duckdns.org:8443 {
-	tls /etc/letsencrypt/live/speekflow.duckdns.org/fullchain.pem /etc/letsencrypt/live/speekflow.duckdns.org/privkey.pem
+# HTTP - EXT (cloudflared tunnel -> :8443 serve o bundle EXT ja reescrito com a URL do tunnel)
+:8443 {
 	import ext_site
 }

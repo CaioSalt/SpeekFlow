@@ -62,20 +62,22 @@ sync_livekit_node_ip() {
   fi
 }
 
-OLD_CACHE=$(cat "$CACHE_FILE" 2>/dev/null || true)
-if [ "$FORCE" = 0 ] && [ "$NEW" = "$OLD_CACHE" ] && [ -n "$NEW" ]; then
-  log "IP sem mudanca ($NEW) - nada a fazer."
+OLD6_CACHE=$(awk '{print $2}' "$CACHE_FILE" 2>/dev/null || true)
+if [ "$FORCE" = 0 ] && [ "$NEW" = "$(awk '{print $1}' "$CACHE_FILE" 2>/dev/null)" ] && [ "$NEW6" = "$OLD6_CACHE" ] && [ -n "$NEW" ]; then
+  log "IP sem mudanca (v4=$NEW v6=$NEW6) - nada a fazer."
   sync_livekit_node_ip
   exit 0
 fi
 
-log "atualizando duckdns -> $NEW..."
-RESP=$(curl -s -m 20 "https://www.duckdns.org/update?domains=${DOMAIN}&token=${TOKEN}&ip=${NEW}")
+log "atualizando duckdns -> v4=$NEW v6=${NEW6:-<sem ipv6>}..."
+PARAMS="domains=${DOMAIN}&token=${TOKEN}&ip=${NEW}&verbose=true"
+if [ -n "$NEW6" ]; then PARAMS="${PARAMS}&ipv6=${NEW6}"; fi
+RESP=$(curl -s -m 20 "https://www.duckdns.org/update?${PARAMS}")
 log "resposta: $RESP"
 
 if [[ "$RESP" == OK* ]]; then
-  echo "$NEW" > "$CACHE_FILE"
-  log "cache atualizado para $NEW"
+  printf '%s %s\n' "$NEW" "$NEW6" > "$CACHE_FILE"
+  log "cache atualizado para $NEW $NEW6"
   sync_livekit_node_ip
 else
   log "ERRO na atualizacao do DuckDNS"
