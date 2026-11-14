@@ -44,6 +44,12 @@ log "ipv4=$NEW4 ipv6=$NEW6 escolha=$NEW"
 # o LiveKit anuncia node_ip para os clientes. Se o IP mudar, voz/video quebram.
 sync_livekit_node_ip() {
   LIVEKIT_YML=/root/speekflow/config/livekit.yml
+  # use_external_ip=true (recomendado desde nov/2026): o LiveKit descobre o IP
+  # publico via STUN a cada start, entao nao ha node_ip para sincronizar.
+  if grep -qE '^\s*use_external_ip:\s*true' "$LIVEKIT_YML" 2>/dev/null; then
+    log "livekit.yml usa STUN (use_external_ip) - nada a sincronizar."
+    return 0
+  fi
   if [[ "$NEW" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] && [ -f "$LIVEKIT_YML" ]; then
     CUR_NODE_IP=$(grep -aoE 'node_ip:[[:space:]]*[0-9.]+' "$LIVEKIT_YML" | grep -aoE '[0-9.]+' | tail -1 || true)
     if [ "$CUR_NODE_IP" != "$NEW" ]; then

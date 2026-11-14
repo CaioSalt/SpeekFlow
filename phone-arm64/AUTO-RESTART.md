@@ -14,7 +14,8 @@
 - Chamadas de voz/vídeo caem no meio, mas o app volta a funcionar quando a rede volta.
 - Se o **IP público mudar** enquanto a internet ficou fora:
   - o cron (`*/5 * * * * /root/speekflow/duckdns-update.sh`) detecta e atualiza o DuckDNS;
-  - o próprio script atualiza o `node_ip` em `config/livekit.yml` e **reinicia o LiveKit** com o IP novo (foi adicionado em Nov/2026). Sem isso, voz/vídeo quebravam quando o IP mudava.
+  - o LiveKit **não precisa de sincronização manual**: usa `use_external_ip: true` (STUN) e descobre o IP público sozinho a cada start.
+  - ~~node_ip fixo no `livekit.yml`~~ **não use**: no Android/proot, o LiveKit 1.13.4 morre com `route ip+net: netlinkrib: invalid argument` antes de subir (confirmado após reboot em nov/2026).
 
 ## 2) O S21 FE desligou/reiniciou
 
